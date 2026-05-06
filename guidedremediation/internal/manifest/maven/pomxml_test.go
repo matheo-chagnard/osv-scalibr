@@ -21,6 +21,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"strings"
 	"testing"
 
 	"deps.dev/util/maven"
@@ -1059,5 +1060,34 @@ func Test_generatePropertyPatches(t *testing.T) {
 		if ok != tt.possible || !reflect.DeepEqual(patches, tt.patches) {
 			t.Errorf("generatePropertyPatches(%s, %s): got %v %v, want %v %v", tt.s1, tt.s2, patches, ok, tt.patches, tt.possible)
 		}
+	}
+}
+
+func TestPathTraversalPrevention(t *testing.T) {
+	// Simulate an original manifest at "parent/grandparent/pom.xml" with a parent escaping its boundary.
+	srv := clienttest.NewMockHTTPServer(t)
+	client, _ := datasource.NewDefaultMavenRegistryAPIClient(t.Context(), srv.URL)
+	mavenRW, err := GetReadWriter(client)
+	if err != nil {
+		t.Fatalf("error creating ReadWriter: %v", err)
+	}
+
+	fsys := scalibrfs.DirFS("./testdata")
+
+	// Create a dummy manifest to pass to Write
+	orig := &mavenManifest{
+		filePath: "parent/grandparent/pom.xml",
+		specific: ManifestSpecific{
+			ParentPaths: []string{"my-app/pom.xml"}, // my-app/pom.xml exists in testdata
+		},
+	}
+
+	// Output path is shallow: /tmp/out.xml
+	err = mavenRW.Write(orig, fsys, nil, "/tmp/out.xml")
+	if err == nil {
+		t.Fatal("expected error due to path traversal, got nil")
+	}
+	if !strings.Contains(err.Error(), "escapes base output directory") {
+		t.Fatalf("expected path traversal error, got %v", err)
 	}
 }
