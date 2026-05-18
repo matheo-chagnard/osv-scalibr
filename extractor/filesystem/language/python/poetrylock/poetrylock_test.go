@@ -82,6 +82,7 @@ func TestExtractor_FileRequired(t *testing.T) {
 }
 
 func TestExtractor_Extract(t *testing.T) {
+	loc := extractor.LocationFromPathAndLine
 	tests := []extracttest.TestTableEntry{
 		{
 			Name: "invalid toml",
@@ -108,7 +109,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "numpy",
 					Version:  "1.23.3",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/one-package.lock"),
+					Location: loc("testdata/one-package.lock", 2),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{},
 					},
@@ -125,7 +126,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "proto-plus",
 					Version:  "1.22.0",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/two-packages.lock"),
+					Location: loc("testdata/two-packages.lock", 2),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{},
 					},
@@ -134,7 +135,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "protobuf",
 					Version:  "4.21.5",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/two-packages.lock"),
+					Location: loc("testdata/two-packages.lock", 16),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{},
 					},
@@ -151,7 +152,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "emoji",
 					Version:  "2.0.0",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/one-package-with-metadata.lock"),
+					Location: loc("testdata/one-package-with-metadata.lock", 2),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{},
 					},
@@ -168,7 +169,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "ike",
 					Version:  "0.2.0",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/source-git.lock"),
+					Location: loc("testdata/source-git.lock", 2),
 					SourceCode: &extractor.SourceCodeIdentifier{
 						Commit: "cd66602cd29f61a2d2e7fb995fef1e61708c034d",
 					},
@@ -188,7 +189,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "appdirs",
 					Version:  "1.4.4",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/source-legacy.lock"),
+					Location: loc("testdata/source-legacy.lock", 2),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{},
 					},
@@ -205,7 +206,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "numpy",
 					Version:  "1.23.3",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/optional-package.lock"),
+					Location: loc("testdata/optional-package.lock", 2),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{"optional"},
 					},
@@ -222,7 +223,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "async-timeout",
 					Version:  "5.0.1",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/multiple-packages.v2.lock"),
+					Location: loc("testdata/multiple-packages.v2.lock", 4),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{"optional"},
 					},
@@ -231,7 +232,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "factory-boy",
 					Version:  "3.3.1",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/multiple-packages.v2.lock"),
+					Location: loc("testdata/multiple-packages.v2.lock", 17),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{"dev"},
 					},
@@ -240,7 +241,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "faker",
 					Version:  "33.3.0",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/multiple-packages.v2.lock"),
+					Location: loc("testdata/multiple-packages.v2.lock", 36),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{"dev", "test"},
 					},
@@ -249,7 +250,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "proto-plus",
 					Version:  "1.22.0",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/multiple-packages.v2.lock"),
+					Location: loc("testdata/multiple-packages.v2.lock", 52),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{},
 					},
@@ -258,7 +259,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "proto-plus",
 					Version:  "1.23.0",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/multiple-packages.v2.lock"),
+					Location: loc("testdata/multiple-packages.v2.lock", 71),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{},
 					},
@@ -267,7 +268,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "protobuf",
 					Version:  "4.25.5",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/multiple-packages.v2.lock"),
+					Location: loc("testdata/multiple-packages.v2.lock", 90),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{},
 					},
@@ -276,7 +277,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "python-dateutil",
 					Version:  "2.9.0.post0",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/multiple-packages.v2.lock"),
+					Location: loc("testdata/multiple-packages.v2.lock", 111),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{"dev", "test"},
 					},
@@ -285,7 +286,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "six",
 					Version:  "1.17.0",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/multiple-packages.v2.lock"),
+					Location: loc("testdata/multiple-packages.v2.lock", 146),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{},
 					},
@@ -294,7 +295,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "typing-extensions",
 					Version:  "4.12.2",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/multiple-packages.v2.lock"),
+					Location: loc("testdata/multiple-packages.v2.lock", 158),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{"dev", "test"},
 					},
@@ -303,7 +304,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "urllib3",
 					Version:  "2.3.0",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/multiple-packages.v2.lock"),
+					Location: loc("testdata/multiple-packages.v2.lock", 170),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{"dev"},
 					},
@@ -312,7 +313,7 @@ func TestExtractor_Extract(t *testing.T) {
 					Name:     "redis",
 					Version:  "5.2.1",
 					PURLType: purl.TypePyPi,
-					Location: extractor.LocationFromPath("testdata/multiple-packages.v2.lock"),
+					Location: loc("testdata/multiple-packages.v2.lock", 126),
 					Metadata: &osv.DepGroupMetadata{
 						DepGroupVals: []string{"optional"},
 					},
