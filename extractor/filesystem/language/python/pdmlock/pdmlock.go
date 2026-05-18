@@ -16,9 +16,14 @@
 package pdmlock
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/google/osv-scalibr/extractor"
@@ -72,20 +77,30 @@ func (e Extractor) FileRequired(api filesystem.FileAPI) bool {
 
 // Extract extracts packages from pdm.lock files passed through the scan input.
 func (e Extractor) Extract(ctx context.Context, input *filesystem.ScanInput) (inventory.Inventory, error) {
-	var parsedLockFile *pdmLockFile
-
-	_, err := toml.NewDecoder(input.Reader).Decode(&parsedLockFile)
+	content, err := io.ReadAll(input.Reader)
 	if err != nil {
+		return inventory.Inventory{}, fmt.Errorf("could not read file: %w", err)
+	}
+
+	var parsedLockFile *pdmLockFile
+	if err := toml.Unmarshal(content, &parsedLockFile); err != nil {
 		return inventory.Inventory{}, fmt.Errorf("could not extract: %w", err)
 	}
+
+	packageNames := make([]string, 0, len(parsedLockFile.Packages))
+	for _, p := range parsedLockFile.Packages {
+		packageNames = append(packageNames, p.Name)
+	}
+	lineNums := findPackageLineNumbers(content, packageNames)
+
 	packages := make([]*extractor.Package, 0, len(parsedLockFile.Packages))
 
-	for _, parsedPKG := range parsedLockFile.Packages {
+	for i, parsedPKG := range parsedLockFile.Packages {
 		pkg := &extractor.Package{
 			Name:     parsedPKG.Name,
 			Version:  parsedPKG.Version,
 			PURLType: purl.TypePyPi,
-			Location: extractor.LocationFromPath(input.Path),
+			Location: extractor.LocationFromPathAndLine(input.Path, lineNums[i]),
 		}
 
 		depGroups := parseGroupsToDepGroups(parsedPKG.Groups)
@@ -104,6 +119,40 @@ func (e Extractor) Extract(ctx context.Context, input *filesystem.ScanInput) (in
 	}
 
 	return inventory.Inventory{Packages: packages}, nil
+}
+
+var nameRegex = regexp.MustCompile(`^name\s*=\s*["']([^"']+)["']`)
+
+func findPackageLineNumbers(content []byte, packageNames []string) []int {
+	lineNums := make([]int, len(packageNames))
+	scanner := bufio.NewScanner(bytes.NewReader(content))
+	currentLine := 0
+	pkgIdx := 0
+	inPackageBlock := false
+
+	for scanner.Scan() {
+		currentLine++
+		line := strings.TrimSpace(scanner.Text())
+
+		if line == "[[package]]" {
+			inPackageBlock = true
+			continue
+		}
+
+		if inPackageBlock && strings.HasPrefix(line, "[") && !strings.HasPrefix(line, "[[package]]") {
+			inPackageBlock = false
+		}
+
+		if inPackageBlock && pkgIdx < len(packageNames) {
+			matches := nameRegex.FindStringSubmatch(line)
+			if len(matches) > 1 && matches[1] == packageNames[pkgIdx] {
+				lineNums[pkgIdx] = currentLine
+				pkgIdx++
+				inPackageBlock = false
+			}
+		}
+	}
+	return lineNums
 }
 
 // parseGroupsToDepGroups converts pdm lockfile groups to the standard DepGroups
