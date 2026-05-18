@@ -16,9 +16,14 @@
 package pylock
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"path/filepath"
+	"regexp"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 	"github.com/google/osv-scalibr/extractor"
@@ -90,17 +95,25 @@ func (e Extractor) FileRequired(api filesystem.FileAPI) bool {
 
 // Extract extracts packages from pylock.toml files passed through the scan input.
 func (e Extractor) Extract(_ context.Context, input *filesystem.ScanInput) (inventory.Inventory, error) {
-	var parsedLockfile *pylockLockfile
-
-	_, err := toml.NewDecoder(input.Reader).Decode(&parsedLockfile)
-
+	content, err := io.ReadAll(input.Reader)
 	if err != nil {
+		return inventory.Inventory{}, fmt.Errorf("could not read file: %w", err)
+	}
+
+	var parsedLockfile *pylockLockfile
+	if err := toml.Unmarshal(content, &parsedLockfile); err != nil {
 		return inventory.Inventory{}, fmt.Errorf("could not extract: %w", err)
 	}
 
+	packageNames := make([]string, 0, len(parsedLockfile.Packages))
+	for _, p := range parsedLockfile.Packages {
+		packageNames = append(packageNames, p.Name)
+	}
+	lineNums := findPackageLineNumbers(content, packageNames)
+
 	packages := make([]*extractor.Package, 0, len(parsedLockfile.Packages))
 
-	for _, lockPackage := range parsedLockfile.Packages {
+	for i, lockPackage := range parsedLockfile.Packages {
 		// this is likely the root package, which is sometimes included in the lockfile
 		if lockPackage.Version == "" && lockPackage.Directory.Path == "." {
 			continue
@@ -110,7 +123,7 @@ func (e Extractor) Extract(_ context.Context, input *filesystem.ScanInput) (inve
 			Name:     lockPackage.Name,
 			Version:  lockPackage.Version,
 			PURLType: purl.TypePyPi,
-			Location: extractor.LocationFromPath(input.Path),
+			Location: extractor.LocationFromPathAndLine(input.Path, lineNums[i]),
 		}
 		if lockPackage.VCS.Commit != "" {
 			pkgDetails.SourceCode = &extractor.SourceCodeIdentifier{
@@ -121,6 +134,54 @@ func (e Extractor) Extract(_ context.Context, input *filesystem.ScanInput) (inve
 	}
 
 	return inventory.Inventory{Packages: packages}, nil
+}
+
+var nameRegex = regexp.MustCompile(`name\s*=\s*["']([^"']+)["']`)
+
+func findPackageLineNumbers(content []byte, packageNames []string) []int {
+	lineNums := make([]int, len(packageNames))
+	scanner := bufio.NewScanner(bytes.NewReader(content))
+	currentLine := 0
+	pkgIdx := 0
+	inPackageBlock := false
+	inPackageList := false
+
+	for scanner.Scan() {
+		currentLine++
+		line := strings.TrimSpace(scanner.Text())
+
+		if line == "[[packages]]" {
+			inPackageBlock = true
+			inPackageList = false
+			continue
+		}
+
+		if strings.HasPrefix(line, "packages = [") {
+			inPackageList = true
+			inPackageBlock = false
+			continue
+		}
+
+		if inPackageBlock && strings.HasPrefix(line, "[") && !strings.HasPrefix(line, "[[packages]]") {
+			inPackageBlock = false
+		}
+
+		if inPackageList && line == "]" {
+			inPackageList = false
+		}
+
+		if (inPackageBlock || inPackageList) && pkgIdx < len(packageNames) {
+			matches := nameRegex.FindStringSubmatch(line)
+			if len(matches) > 1 && matches[1] == packageNames[pkgIdx] {
+				lineNums[pkgIdx] = currentLine
+				pkgIdx++
+				if inPackageBlock {
+					inPackageBlock = false
+				}
+			}
+		}
+	}
+	return lineNums
 }
 
 var _ filesystem.Extractor = Extractor{}
